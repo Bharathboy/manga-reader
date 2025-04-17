@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Manga Reader</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      color: white;
+      font-family: sans-serif;
+    }
+    #reader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    img {
+      width: 100%;
+      max-width: 1000px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    #error {
+      color: red;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="reader">Loading...</div>
+
+  <script type="module">
+    import * as zip from "https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.28/+esm";
+
+    const params = new URLSearchParams(location.search);
+    const cbzUrl = params.get("cbz");
+    const readerContainer = document.getElementById("reader");
+
+    if (!cbzUrl) {
+      readerContainer.innerHTML = "<div id='error'>❌ No CBZ URL provided. Use <code>?cbz=https://example.com/your.cbz</code></div>";
+      throw new Error("Missing CBZ URL");
+    }
+
+    try {
+      const response = await fetch(cbzUrl);
+      const blob = await response.blob();
+
+      const reader = new zip.ZipReader(new zip.BlobReader(blob));
+      const entries = await reader.getEntries();
+      const imageEntries = entries.filter(e => e.filename.match(/\.(jpe?g|png)$/i));
+
+      if (imageEntries.length === 0) {
+        readerContainer.innerHTML = "<div id='error'>❌ No images found in CBZ file.</div>";
+      } else {
+        readerContainer.innerHTML = "";
+        for (const entry of imageEntries) {
+          const imgBlob = await entry.getData(new zip.BlobWriter());
+          const img = document.createElement("img");
+          img.src = URL.createObjectURL(imgBlob);
+          readerContainer.appendChild(img);
+        }
+      }
+
+      await reader.close();
+    } catch (err) {
+      readerContainer.innerHTML = `<div id='error'>❌ Error reading CBZ: ${err.message}</div>`;
+      console.error(err);
+    }
+  </script>
+</body>
+</html>
